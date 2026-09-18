@@ -4,7 +4,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+from miles.rollout.session.config import SessionServerConfig
 from miles.rollout.session.errors import MessageValidationError, SessionNotFoundError, TokenizationError
+from miles.rollout.session.request_args import PreparedChatRequest, prepare_chat_request
 from miles.rollout.session.types import SessionRecord
 from miles.utils.chat_template_utils.message_matcher_hub import (
     SessionMessageMatcher,
@@ -67,6 +69,9 @@ class LinearTrajectory:
     but the agent may retry from an earlier point (e.g. re-running a tool call),
     in which case the session is rolled back at most one assistant step.
 
+    ``prepare_token_ids_and_request_args`` serves a request: roll back, decide
+    request arguments, then render the prompt.
+
     Concurrency contract: all mutating methods must be called under ``self.lock``.
     """
 
@@ -86,41 +91,62 @@ class LinearTrajectory:
     def append_record(self, record: SessionRecord) -> None:
         self.records.append(record)
 
-    def prepare_pretokenized(
+    def prepare_token_ids_and_request_args(
+        self,
+        client_args: dict[str, Any],
+        *,
+        config: SessionServerConfig,
+        tito_tokenizer: TITOTokenizer,
+        message_matcher: SessionMessageMatcher | None = None,
+    ) -> PreparedChatRequest:
+        """Return the prepared request with prompt token IDs in `body["input_ids"]`.
+
+        The caller must hold `self.lock`.
+        """
+        matcher = message_matcher if message_matcher is not None else strict_message_matches
+        request_messages = client_args.get("messages", [])
+        self._try_detect_and_rollback_to_assistant_checkpoint(request_messages, matcher)
+        prepared = prepare_chat_request(client_args, tito_tokenizer, config=config, turn_args=None)
+        prepared.body["input_ids"] = self._render_token_ids(
+            request_messages,
+            template_args=prepared.template_args,
+            tito_tokenizer=tito_tokenizer,
+            message_matcher=matcher,
+        )
+        return prepared
+
+    def _render_token_ids(
         self,
         request_messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
         *,
+        template_args: dict[str, Any],
         tito_tokenizer: TITOTokenizer,
         message_matcher: SessionMessageMatcher | None = None,
     ) -> list[int]:
-        """Build the full prompt input_ids for *request_messages*.
+        """Build prompt token IDs while reusing the stored token prefix.
+
+        Use `template_args` for newly rendered tokens after rollback.
 
         Validates that *request_messages* extends the stored history under
-        *message_matcher* (defaults to the strict matcher), rolling back at
-        most one assistant step on agent retries, then reuses the stored
-        token_ids as the pretokenized prefix.  When no stored checkpoint
-        is left to build on — the first turn, or a retry of the first turn that
-        rolled the session back to empty — renders *request_messages* from
-        scratch via the chat template instead.
+        *message_matcher* (defaults to the strict matcher) and reuses the stored
+        token_ids as the pretokenized prefix.  When no stored checkpoint is left
+        to build on — the first turn, or a retry of the first turn that rolled
+        the session back to empty — renders *request_messages* from scratch via
+        the chat template instead.
 
         Must be called under ``self.lock``.
         """
         matcher = message_matcher if message_matcher is not None else strict_message_matches
 
-        # 1. Detect agent retries and roll back (at most one assistant step). Retrying the
-        #    first turn rolls back to the empty checkpoint, clearing token_ids.
-        self._try_detect_and_rollback_to_assistant_checkpoint(request_messages, matcher)
-
         if not self.token_ids:
             return tito_tokenizer.apply_chat_template(
                 request_messages,
-                tools=tools,
                 add_generation_prompt=True,
                 tokenize=True,
+                template_args=template_args,
             )
 
-        # 2. Confirm the (possibly rolled-back) stored messages are a prefix of request,
+        # Confirm the (rolled-back) stored messages are a prefix of request,
         #    and that each appended message role is in tito_tokenizer.allowed_append_roles.
         try:
             assert_messages_append_only_with_allowed_role(
@@ -136,7 +162,7 @@ class LinearTrajectory:
             old_messages=self.messages,
             new_messages=effective_messages,
             pretokenized_token_ids=self.token_ids,
-            tools=tools,
+            template_args=template_args,
         )
 
     def update_pretokenized_state(
@@ -335,9 +361,9 @@ class SessionRegistry:
             tools = session.records[-1].request.get("tools") if session.records else None
             expected_ids = self.tito_tokenizer.apply_chat_template(
                 session.messages,
-                tools=tools,
                 add_generation_prompt=False,
                 tokenize=True,
+                template_args=self.tito_tokenizer.default_template_args(tools),
             )
             mismatches = self.comparator.compare_sequences(expected_ids, session.token_ids)
             return [m.to_dict() for m in mismatches]
