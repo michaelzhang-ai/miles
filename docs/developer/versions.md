@@ -92,7 +92,7 @@ fleet's image is.
 | `cu13` | `radixark/miles:dev` | `linux/amd64` + `linux/arm64`, one manifest. This is the daily image |
 | `cu13-x86` / `cu13-aarch64` | `radixark/miles:dev` | Single-arch rebuilds of the same image |
 | `cu12-x86` | `radixark/miles:dev-cu12` | `linux/amd64`, CUDA 12.9 legacy |
-| `rocm720-mi35x` / `rocm10-mi35x` | `rocm/sgl-dev:miles-rocm*-mi35x` | Native |
+| `rocm10-mi35x` | `rocm/sgl-dev:miles-rocm10-mi35x` | Native |
 
 `--image-tag dev` also publishes a timestamped sibling. Scheduled retention and manual tag behavior are documented in [Docker build](/developer/ci/02-docker-build).
 
@@ -166,9 +166,9 @@ rebuild constantly, and instead forces a build once the last one is 24 hours old
 follows its dependencies immediately and trails Miles `main` by at most a day. When you need
 that to stop moving underneath you, pin `ci-image-tag:` to a timestamped tag.
 
-**The ROCm images move daily too.** The sgl-project/sglang nightlies rebuild the undated
-`rocm/sgl-dev:miles-rocm*-mi35x` tags from Miles `main` every day and publish a dated
-`-YYYYMMDD` sibling; an out-of-band rebuild is a `workflow_dispatch` on the variant you want.
+**The ROCm image moves daily too.** The sgl-project/sglang nightly rebuilds the undated
+`rocm/sgl-dev:miles-rocm10-mi35x` tag from Miles `main` every day and publishes a dated
+`-YYYYMMDD` sibling; an out-of-band rebuild is a `workflow_dispatch` on `rocm10-mi35x`.
 
 ## After a bump, the usual suspects
 
