@@ -172,7 +172,7 @@ RUN if [ "$APPLY_ROCR_VMMFIX" = "1" ]; then \
     fi
 
 # Upstream Megatron-Bridge requires Python 3.12. On the Python 3.10 base (rocm720-mi35x), waive its
-# requires-python gate and backport its 3.12-only typing imports with megatron_bridge_py310.patch.
+# requires-python gate and apply megatron_bridge_py310.patch, which imports Self from typing_extensions.
 RUN bridge_py310=$(python3 -c 'import sys; print(int(sys.version_info < (3, 12)))') && \
     PIP_IGNORE_REQUIRES_PYTHON=${bridge_py310} \
       pip install git+https://github.com/radixark/Megatron-Bridge.git@2e09c234a3272285140224d0d698593418b55ba5 --no-deps --no-build-isolation && \
