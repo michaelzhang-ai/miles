@@ -65,6 +65,7 @@ ENV CMAKE_PREFIX_PATH=/opt/rocm:/opt/rocm/hip:/usr/local:/usr
 # TODO: remove these patches once the changes are merged into the main codebase.
 COPY docker/amd_patch/latest/tile_kernels.patch /tmp/amd_patch/tile_kernels.patch
 COPY docker/amd_patch/latest/tilelang_hip_fp8.patch /tmp/amd_patch/tilelang_hip_fp8.patch
+COPY docker/amd_patch/latest/megatron_bridge_py310.patch /tmp/amd_patch/megatron_bridge_py310.patch
 COPY requirements.txt /tmp/requirements.txt
 
 # ======================================== Apt dependencies =====================================
@@ -169,7 +170,16 @@ RUN if [ "$APPLY_ROCR_VMMFIX" = "1" ]; then \
     else \
       echo "[vmmfix] skipped (APPLY_ROCR_VMMFIX=$APPLY_ROCR_VMMFIX; ROCm 10 has the fix upstream)"; \
     fi
-RUN pip install git+https://github.com/radixark/Megatron-Bridge.git@2e09c234a3272285140224d0d698593418b55ba5 --no-deps --no-build-isolation
+
+# Upstream Megatron-Bridge requires Python 3.12. On the Python 3.10 base (rocm720-mi35x), waive its
+# requires-python gate and backport its 3.12-only typing imports with megatron_bridge_py310.patch.
+RUN bridge_py310=$(python3 -c 'import sys; print(int(sys.version_info < (3, 12)))') && \
+    PIP_IGNORE_REQUIRES_PYTHON=${bridge_py310} \
+      pip install git+https://github.com/radixark/Megatron-Bridge.git@2e09c234a3272285140224d0d698593418b55ba5 --no-deps --no-build-isolation && \
+    if [ "${bridge_py310}" = "1" ]; then \
+      patch --fuzz=0 -p1 -d "$(python3 -c 'import site; print(site.getsitepackages()[0])')" < /tmp/amd_patch/megatron_bridge_py310.patch || { \
+        echo "megatron_bridge_py310.patch does not apply to the pinned Megatron-Bridge; refresh it" >&2; exit 1; }; \
+    fi
 RUN pip install megatron-energon --no-deps
 RUN pip install multi-storage-client --no-deps
 

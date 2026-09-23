@@ -1,0 +1,42 @@
+diff -ru a/megatron/bridge/models/hf_pretrained/masked_lm.py b/megatron/bridge/models/hf_pretrained/masked_lm.py
+--- a/megatron/bridge/models/hf_pretrained/masked_lm.py
++++ b/megatron/bridge/models/hf_pretrained/masked_lm.py
+@@ -14,7 +14,9 @@
+ # limitations under the License.
+ 
+ from pathlib import Path
+-from typing import Any, Dict, Generic, List, Optional, Self, TypeVar, Union
++from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
++
++from typing_extensions import Self
+ 
+ import torch
+ from transformers import (
+diff -ru a/megatron/bridge/models/hybrid/hybrid_provider.py b/megatron/bridge/models/hybrid/hybrid_provider.py
+--- a/megatron/bridge/models/hybrid/hybrid_provider.py
++++ b/megatron/bridge/models/hybrid/hybrid_provider.py
+@@ -17,7 +17,9 @@
+ import logging
+ import warnings
+ from dataclasses import dataclass, field
+-from typing import Callable, Literal, Self
++from typing import Callable, Literal
++
++from typing_extensions import Self
+ 
+ import torch
+ from megatron.core.models.hybrid.hybrid_layer_specs import (
+diff -ru a/megatron/bridge/models/model_provider.py b/megatron/bridge/models/model_provider.py
+--- a/megatron/bridge/models/model_provider.py
++++ b/megatron/bridge/models/model_provider.py
+@@ -16,7 +16,9 @@
+ import os
+ import warnings
+ from pathlib import Path
+-from typing import Any, Callable, Generic, Mapping, Self, TypedDict, TypeVar, Union
++from typing import Any, Callable, Generic, Mapping, TypedDict, TypeVar, Union
++
++from typing_extensions import Self
+ 
+ from megatron.bridge.models.common.unimodal import _ddp_wrap, _print_num_params
+ 
