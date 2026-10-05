@@ -170,7 +170,7 @@ RUN python -c "import sglang; import sgl_kernel; print('SGLang + sgl_kernel: OK'
 # aiter compiles the attention kernels the base image leaves out (sglang's extend and decode ones) on
 # first use, which costs every fresh container minutes in hipcc. 1 builds sglang's bf16 ones for GPU_ARCH.
 ARG AITER_PREBUILD_JIT=0
-RUN --mount=type=bind,source=docker/prebuild_aiter_jit.py,target=/tmp/prebuild_aiter_jit.py \
+RUN --mount=type=bind,source=docker/amd/prebuild_aiter_jit.py,target=/tmp/prebuild_aiter_jit.py \
     if [ "${AITER_PREBUILD_JIT}" = "1" ]; then \
       GPU_ARCHS=${GPU_ARCH} python3 /tmp/prebuild_aiter_jit.py; \
     else \
