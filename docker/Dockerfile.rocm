@@ -27,7 +27,7 @@ ARG SGLANG_COMMIT=""
 ARG MEGATRON_REPO=radixark/Megatron-LM
 ARG MEGATRON_BRANCH=miles-main
 
-ARG MILES_COMMIT=main
+ARG MILES_COMMIT=amd/lazy-lora-converter-import
 
 ARG GPU_ARCH=gfx950
 # 1 installs the ROCm 7.2.4 VMM-pause fix; ROCm 10 has it upstream.
@@ -227,7 +227,7 @@ RUN bash /tmp/install-kube-tools.sh "${TARGETARCH}" && rm -f /tmp/install-kube-t
 
 # ====================================== Install main package ===================================
 
-RUN git clone https://github.com/radixark/miles.git /root/miles && \
+RUN git clone https://github.com/michaelzhang-ai/miles.git /root/miles && \
     cd /root/miles && \
     git checkout ${MILES_COMMIT} && \
     pip install -e . --no-deps
